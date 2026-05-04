@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard - Attendance System</title>
+    <link rel="stylesheet" href="./CSS/style.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <h3>Admin Panel</h3>
+            <nav>
+                <ul>
+                    <li class="active" onclick="showSection('dashboardSection', this)">Dashboard</li>
+                    <li onclick="showSection('studentsSection', this)">Manage Students</li>
+                    <li onclick="showSection('teachersSection', this)">Manage Teachers</li>
+                </ul>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <div class="header">
+                <h1>Admin Dashboard</h1>
+                <div class="user-info">
+                    <span>Welcome, <strong id="userName">Admin</strong></span>
+                    <button class="logout-btn" data-action="logout">Logout</button>
+                </div>
+            </div>
+
+            <!-- DASHBOARD -->
+            <div id="dashboardSection" class="section">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Total Students</h3>
+                        <div class="number" id="totalStudents">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Total Teachers</h3>
+                        <div class="number" id="totalTeachers">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Attendance Records</h3>
+                        <div class="number" id="totalAttendanceRecords">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Today's Attendance</h3>
+                        <div class="number" id="todayAttendanceRecords">0</div>
+                    </div>
+                </div>
+
+                <div class="chart-card">
+                    <div class="chart-header">
+                        <h3>Attendance Trend</h3>
+                        <div class="report-actions">
+                            <button class="btn btn-secondary" onclick="downloadReport('excel')">Export Excel</button>
+                            <button class="btn btn-secondary" onclick="downloadReport('pdf')">Export PDF</button>
+                        </div>
+                    </div>
+                    <canvas id="attendanceChart" width="720" height="260"></canvas>
+                </div>
+
+                <div class="role-overview-grid">
+                    <div class="role-panel student-panel">
+                        <div class="role-panel-header">
+                            <div>
+                                <span class="role-label role-student">Students</span>
+                                <h2>Student Directory</h2>
+                            </div>
+                            <button class="btn btn-inline" onclick="showSection('studentsSection', document.querySelectorAll('.sidebar nav ul li')[1])">Manage Students</button>
+                        </div>
+                        <div id="dashboardStudentsList" class="person-list"></div>
+                    </div>
+
+                    <div class="role-panel teacher-panel">
+                        <div class="role-panel-header">
+                            <div>
+                                <span class="role-label role-teacher">Teachers</span>
+                                <h2>Teacher Directory</h2>
+                            </div>
+                            <button class="btn btn-inline" onclick="showSection('teachersSection', document.querySelectorAll('.sidebar nav ul li')[2])">Manage Teachers</button>
+                        </div>
+                        <div id="dashboardTeachersList" class="person-list"></div>
+                    </div>
+                </div>
+
+                <div class="section-toolbar">
+                    <div>
+                        <h2>Recent Attendance</h2>
+                        <p>Latest marked records across all classes.</p>
+                    </div>
+                    <a class="btn btn-inline" href="http://localhost:5000/api/attendance/export/excel">Export Attendance</a>
+                </div>
+
+                <div class="data-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Student</th>
+                                <th>Roll No</th>
+                                <th>Class</th>
+                                <th>Status</th>
+                                <th>Marked By</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentAttendanceTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- STUDENTS -->
+            <div id="studentsSection" class="section hidden">
+                <h2 class="mb-20">Add New Student</h2>
+
+                <div class="form-container">
+                    <form id="addStudentForm">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Full Name</label>
+                                <input type="text" id="studName">
+                            </div>
+                            <div class="form-group">
+                                <label>Roll Number</label>
+                                <input type="text" id="studRoll">
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Class</label>
+                                <input type="text" id="studClass">
+                            </div>
+                            <div class="form-group">
+                                <label>Branch</label>
+                                <input type="text" id="studBranch">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>Section</label>
+                            <input type="text" id="studSection">
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Username</label>
+                                <input type="text" id="studUsername">
+                            </div>
+                            <div class="form-group">
+                                <label>Password</label>
+                                <input type="password" id="studPassword">
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn">Add Student</button>
+                    </form>
+                </div>
+
+                <div class="import-panel">
+                    <div>
+                        <h3>Import Students From Excel</h3>
+                        <p>Columns: name, rollNumber, class, branch, section, username, password, email</p>
+                    </div>
+                    <div class="import-actions">
+                        <input type="file" id="studentImportFile" accept=".xlsx,.xls">
+                        <button type="button" class="btn" onclick="importUsers('student')">Import Students</button>
+                    </div>
+                </div>
+
+                <h2 class="mt-20 mb-20">Student List</h2>
+
+                <div class="list-toolbar">
+                    <input type="search" id="studentSearch" placeholder="Search students by name, roll no, branch, section">
+                    <span id="studentCount" class="count-pill">0 students</span>
+                </div>
+
+                <div class="data-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Roll No</th>
+                                <th>Name</th>
+                                <th>Class</th>
+                                <th>Branch</th>
+                                <th>Section</th>
+                                <th>Username</th>
+                            </tr>
+                        </thead>
+                        <tbody id="studentTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TEACHERS -->
+            <div id="teachersSection" class="section hidden">
+                <h2 class="mb-20">Add New Teacher</h2>
+
+                <div class="form-container">
+                    <form id="addTeacherForm">
+                        <div class="form-group">
+                            <label>Full Name</label>
+                            <input type="text" id="teacherName">
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Username</label>
+                                <input type="text" id="teacherUsername">
+                            </div>
+                            <div class="form-group">
+                                <label>Password</label>
+                                <input type="password" id="teacherPassword">
+                            </div>
+                        </div>
+
+                        <button type="submit" class="btn">Add Teacher</button>
+                    </form>
+                </div>
+
+                <div class="import-panel">
+                    <div>
+                        <h3>Import Teachers From Excel</h3>
+                        <p>Columns: name, username, password, email, subject</p>
+                    </div>
+                    <div class="import-actions">
+                        <input type="file" id="teacherImportFile" accept=".xlsx,.xls">
+                        <button type="button" class="btn" onclick="importUsers('teacher')">Import Teachers</button>
+                    </div>
+                </div>
+
+                <h2 class="mt-20 mb-20">Teacher List</h2>
+
+                <div class="list-toolbar">
+                    <input type="search" id="teacherSearch" placeholder="Search teachers by name, username, subject">
+                    <span id="teacherCount" class="count-pill">0 teachers</span>
+                </div>
+
+                <div class="data-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Username</th>
+                                <th>Email</th>
+                            </tr>
+                        </thead>
+                        <tbody id="teacherTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- PROFILE -->
+            <div id="profileSection" class="section hidden">
+                <button class="back-link" onclick="goBack()">Back to Dashboard</button>
+                <div id="profileContent"></div>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- JS -->
+    <script src="./JS/api.js"></script>
+    <script src="./JS/auth.js"></script>
+    <script src="./JS/admin-dashboard.js"></script>
+
+</body>
+</html>

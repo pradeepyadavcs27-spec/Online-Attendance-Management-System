@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mark Attendance - Attendance System</title>
+    <link rel="stylesheet" href="./CSS/style.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <h3>Teacher Panel</h3>
+            <nav>
+                <ul>
+                    <li><a href="teacher-dashboard.html">Dashboard</a></li>
+                    <li><a href="mark-attendance.html" class="active">Mark Attendance</a></li>
+                    <li><a href="login.html" data-action="logout">Logout</a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="header">
+                <h1>Mark Attendance</h1>
+                <div class="user-info">
+                    <span>Welcome, <strong id="userName">Teacher</strong></span>
+                    <button class="logout-btn" data-action="logout">Logout</button>
+                </div>
+            </div>
+
+            <!-- Date Selection -->
+            <div class="attendance-date">
+                <label for="attendanceDate" style="font-weight: 600; margin-right: 10px;">Select Date:</label>
+                <input type="date" id="attendanceDate">
+                <button class="btn" onclick="loadAttendanceList()" style="width: auto; margin-left: 10px;">Load Students</button>
+            </div>
+
+            <div class="filter-panel">
+                <div class="form-group">
+                    <label>Class</label>
+                    <select id="classFilter" onchange="renderAttendanceList()">
+                        <option value="">All Classes</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Branch</label>
+                    <select id="branchFilter" onchange="renderAttendanceList()">
+                        <option value="">All Branches</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Section</label>
+                    <select id="sectionFilter" onchange="renderAttendanceList()">
+                        <option value="">All Sections</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Search</label>
+                    <input type="search" id="studentSearch" placeholder="Name or roll no" oninput="renderAttendanceList()">
+                </div>
+            </div>
+
+            <!-- Success Message -->
+            <div id="saveSuccess" class="success-message hidden">
+                Attendance saved successfully!
+            </div>
+
+            <!-- Attendance List -->
+            <div class="attendance-list" id="attendanceContainer">
+                <div style="padding: 40px; text-align: center; color: #7f8c8d;">
+                    Please select a date and click "Load Students" to begin marking attendance.
+                </div>
+            </div>
+
+            <!-- Save Button -->
+            <div class="mt-20 text-center" id="saveButtonContainer" style="display: none;">
+                <button class="btn btn-success" onclick="saveAttendance()" style="width: auto; padding: 15px 50px; font-size: 18px;">
+                    Save Attendance
+                </button>
+            </div>
+        </main>
+    </div>
+
+    <script src="./JS/api.js"></script>
+    <script src="./JS/storage.js"></script>
+    <script src="./JS/auth.js"></script>
+    <script>
+        (async function() {
+            const user = await AuthManager.verifyAuth('teacher');
+            if (!user) return;
+            AuthManager.updateUI();
+            document.getElementById('attendanceDate').valueAsDate = new Date();
+            
+            // Store temporary attendance data
+            let tempAttendance = {};
+            let allStudents = [];
+            let existingStatusMap = {};
+
+            window.tempAttendance = tempAttendance;
+            window.allStudents = allStudents;
+            window.existingStatusMap = existingStatusMap;
+        })();
+
+        // Set today's date as default
+        document.getElementById('attendanceDate').valueAsDate = new Date();
+        
+        // Store temporary attendance data
+        let tempAttendance = {};
+        let allStudents = [];
+        let existingStatusMap = {};
+        
+        // Load students from backend
+        async function loadAttendanceList() {
+            const date = document.getElementById('attendanceDate').value;
+            if (!date) {
+                alert('Please select a date');
+                return;
+            }
+            
+            try {
+                allStudents = await StorageManager.getStudents();
+                
+                // Get existing attendance for this date
+                const existingRecords = await StorageManager.getAttendanceByDate(date);
+                
+                // Create map of existing records
+                existingStatusMap = {};
+                existingRecords.forEach(r => {
+                    existingStatusMap[r.studentId._id || r.studentId] = String(r.status).toLowerCase();
+                });
+                
+                tempAttendance = {};
+                hydrateFilters(allStudents);
+                renderAttendanceList();
+            } catch (error) {
+                console.error('Error loading attendance:', error);
+                alert('Failed to load students');
+            }
+        }
+
+        function hydrateFilters(students) {
+            fillSelect('classFilter', students.map(student => student.class));
+            fillSelect('branchFilter', students.map(student => student.branch));
+            fillSelect('sectionFilter', students.map(student => student.section));
+        }
+
+        function fillSelect(id, values) {
+            const select = document.getElementById(id);
+            const currentValue = select.value;
+            const label = select.options[0].textContent;
+            const uniqueValues = [...new Set(values.filter(Boolean))].sort();
+
+            select.innerHTML = `<option value="">${label}</option>`;
+            uniqueValues.forEach(value => {
+                const option = document.createElement('option');
+                option.value = value;
+                option.textContent = value;
+                select.appendChild(option);
+            });
+
+            if (uniqueValues.includes(currentValue)) {
+                select.value = currentValue;
+            }
+        }
+
+        function renderAttendanceList() {
+            const classFilter = document.getElementById('classFilter').value;
+            const branchFilter = document.getElementById('branchFilter').value;
+            const sectionFilter = document.getElementById('sectionFilter').value;
+            const search = document.getElementById('studentSearch').value.toLowerCase().trim();
+            const container = document.getElementById('attendanceContainer');
+            let html = '';
+
+            const students = allStudents.filter(student => {
+                const matchesClass = !classFilter || student.class === classFilter;
+                const matchesBranch = !branchFilter || student.branch === branchFilter;
+                const matchesSection = !sectionFilter || student.section === sectionFilter;
+                const searchValue = `${student.name || ''} ${student.rollNumber || ''}`.toLowerCase();
+
+                return matchesClass && matchesBranch && matchesSection && searchValue.includes(search);
+            });
+
+                students.forEach(student => {
+                    const studentId = student._id;
+                    const existingStatus = tempAttendance[studentId] || existingStatusMap[studentId];
+                    if (existingStatus) {
+                        tempAttendance[studentId] = existingStatus;
+                    }
+                    
+                    html += `
+                        <div class="attendance-item" data-student="${studentId}">
+                            <div class="student-info">
+                                <h4>${student.name}</h4>
+                                <span>
+                                    Roll: ${student.rollNumber || '-'} |
+                                    Class: ${student.class || '-'} |
+                                    Branch: ${student.branch || '-'} |
+                                    Section: ${student.section || '-'}
+                                </span>
+                            </div>
+                            <div class="attendance-actions">
+                                <button class="btn-present ${existingStatus === 'present' ? 'selected' : ''}" 
+                                        onclick="markStatus('${studentId}', 'present', this)">
+                                    Present
+                                </button>
+                                <button class="btn-absent ${existingStatus === 'absent' ? 'selected' : ''}" 
+                                        onclick="markStatus('${studentId}', 'absent', this)">
+                                    Absent
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                });
+                
+                if (students.length === 0) {
+                    html = '<div style="padding: 40px; text-align: center;">No students match this filter.</div>';
+                    document.getElementById('saveButtonContainer').style.display = 'none';
+                } else {
+                    document.getElementById('saveButtonContainer').style.display = 'block';
+                }
+                
+                container.innerHTML = html;
+        }
+        
+        function markStatus(studentId, status, btn) {
+            tempAttendance[studentId] = status;
+            
+            const item = btn.closest('.attendance-item');
+            const buttons = item.querySelectorAll('button');
+            buttons.forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+        }
+        
+        // Save attendance to backend
+        async function saveAttendance() {
+            const date = document.getElementById('attendanceDate').value;
+            const teacher = AuthManager.getCurrentUser();
+            
+            if (Object.keys(tempAttendance).length === 0) {
+                alert('Please mark attendance for at least one student');
+                return;
+            }
+            
+            try {
+                // Prepare records array
+                const records = Object.keys(tempAttendance).map(studentId => ({
+                    studentId: studentId,
+                    status: tempAttendance[studentId]
+                }));
+                
+                // Send to backend
+                await API.bulkMarkAttendance(date, records, teacher.id);
+                
+                document.getElementById('saveSuccess').classList.remove('hidden');
+                setTimeout(() => {
+                    document.getElementById('saveSuccess').classList.add('hidden');
+                }, 3000);
+                
+                loadAttendanceList(); // Refresh
+                
+            } catch (error) {
+                console.error('Error saving attendance:', error);
+                alert('Failed to save attendance: ' + error.message);
+            }
+        }
+        
+        // Auto load for today
+        window.onload = function() {
+            loadAttendanceList();
+        };
+    </script>
+</body>
+</html>

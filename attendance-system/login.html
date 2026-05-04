@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Attendance Management System</title>
+
+    <!-- ✅ Correct CSS path -->
+    <link rel="stylesheet" href="./CSS/style.css">
+</head>
+
+<body>
+    <div class="login-container">
+        <div class="login-box">
+            <h2>Attendance System</h2>
+
+            <form id="loginForm">
+                <div class="form-group">
+                    <label>Username</label>
+                    <input type="text" id="username" placeholder="Enter username">
+                    <span class="error-message"></span>
+                </div>
+                
+                <div class="form-group">
+                    <label>Password</label>
+                    <input type="password" id="password" placeholder="Enter password">
+                    <span class="error-message"></span>
+                </div>
+                
+                <div class="form-group">
+                    <label>Login As</label>
+                    <select id="role">
+                        <option value="">Select Role</option>
+                        <option value="admin">Admin</option>
+                        <option value="teacher">Teacher</option>
+                        <option value="student">Student</option>
+                    </select>
+                    <span class="error-message"></span>
+                </div>
+                
+                <button type="submit" class="btn">Login</button>
+            </form>
+
+            <div class="demo-credentials">
+                <h4>Demo Credentials:</h4>
+                <ul>
+                    <li>Admin: admin / admin123</li>
+                    <li>Teacher: teacher1 / teacher123</li>
+                    <li>Student: student1 / student123</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- ✅ Correct JS paths -->
+    <script src="./JS/validation.js"></script>
+    <script src="./JS/auth.js"></script>
+
+    <script>
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const role = document.getElementById('role').value;
+
+            if (!username || !password || !role) {
+                alert("All fields required");
+                return;
+            }
+
+            const btn = this.querySelector('button');
+            btn.textContent = "Logging in...";
+            btn.disabled = true;
+
+            try {
+                const result = await AuthManager.login(username, password, role);
+
+                if (result && result.success) {
+
+                    // Use replace so the login page is removed from history
+                    // and the browser back button does not return to login.
+                    if (role === "admin") {
+                        window.location.replace("./admin-Dashboard.html");
+                    } 
+                    else if (role === "teacher") {
+                        window.location.replace("./teacher-dashboard.html");
+                    } 
+                    else {
+                        window.location.replace("./student-dashboard.html");
+                    }
+
+                } else {
+                    alert(result.message || "Login failed");
+                }
+
+            } catch (err) {
+                alert("Server error");
+            }
+
+            btn.textContent = "Login";
+            btn.disabled = false;
+        });
+    </script>
+
+</body>
+</html>

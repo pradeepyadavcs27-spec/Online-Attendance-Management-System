@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Teacher Dashboard - Attendance System</title>
+    <link rel="stylesheet" href="./CSS/style.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <aside class="sidebar">
+            <h3>Teacher Panel</h3>
+            <nav>
+                <ul>
+                    <li><a href="teacher-dashboard.html" class="active">Dashboard</a></li>
+                    <li><a href="mark-attendance.html">Mark Attendance</a></li>
+                    <li><a href="login.html" data-action="logout">Logout</a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <main class="main-content">
+            <div class="header">
+                <h1>Teacher Dashboard</h1>
+                <div class="user-info">
+                    <span>Welcome, <strong id="userName">Teacher</strong></span>
+                    <span id="userRole" style="color: #7f8c8d; font-size: 14px;"></span>
+                    <button class="logout-btn" data-action="logout">Logout</button>
+                </div>
+            </div>
+
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Total Students</h3>
+                    <div class="number" id="totalStudents">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Today's Attendance</h3>
+                    <div class="number" id="todayAttendance">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Attendance Marked</h3>
+                    <div class="number" id="markedCount">0</div>
+                </div>
+            </div>
+
+            <div class="mt-20">
+                <h2 class="mb-20">Recent Attendance Records</h2>
+                <div class="data-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Student Name</th>
+                                <th>Roll Number</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="recentRecords">
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="mt-20 text-center">
+                <a href="mark-attendance.html" class="btn" style="display: inline-block; width: auto; padding: 15px 40px; font-size: 18px;">
+                    Mark Today's Attendance
+                </a>
+            </div>
+        </main>
+    </div>
+
+    <script src="./JS/api.js"></script>
+    <script src="./JS/storage.js"></script>
+    <script src="./JS/auth.js"></script>
+    <script>
+        (async function() {
+            const user = await AuthManager.verifyAuth('teacher');
+            if (!user) return;
+            AuthManager.updateUI();
+            loadStats();
+            loadRecentRecords();
+        })();
+        
+        async function loadStats() {
+            try {
+                const students = await StorageManager.getStudents();
+                document.getElementById('totalStudents').textContent = students.length;
+                
+                const today = new Date().toISOString().split('T')[0];
+                const todayRecords = await StorageManager.getAttendanceByDate(today);
+                document.getElementById('todayAttendance').textContent = todayRecords.length;
+                document.getElementById('markedCount').textContent = todayRecords.length + '/' + students.length;
+            } catch (error) {
+                console.error('Error loading stats:', error);
+            }
+        }
+        
+        async function loadRecentRecords() {
+            try {
+                const records = await StorageManager.getAttendance();
+                const tbody = document.getElementById('recentRecords');
+                tbody.innerHTML = '';
+                
+                if (records.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="4" style="text-align: center;">No records yet</td></tr>';
+                    return;
+                }
+                
+                records.slice(-10).reverse().forEach(record => {
+                    const student = record.studentId;
+                    const status = String(record.status).toLowerCase();
+                    if (student) {
+                        const row = tbody.insertRow();
+                        row.innerHTML = `
+                            <td>${record.date}</td>
+                            <td>${student.name}</td>
+                            <td>${student.rollNumber || '-'}</td>
+                            <td style="color: ${status === 'present' ? '#27ae60' : '#e74c3c'}; font-weight: bold; text-transform: capitalize;">
+                                ${status}
+                            </td>
+                        `;
+                    }
+                });
+            } catch (error) {
+                console.error('Error loading records:', error);
+            }
+        }
+        
+</body>
+</html>

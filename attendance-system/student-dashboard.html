@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Student Dashboard - Attendance System</title>
+    <link rel="stylesheet" href="./CSS/style.css">
+</head>
+<body>
+    <div class="dashboard-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <h3>Student Panel</h3>
+            <nav>
+                <ul>
+                    <li><a href="student-dashboard.html" class="active">My Attendance</a></li>
+                    <li><a href="login.html" data-action="logout">Logout</a></li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="header">
+                <h1>My Attendance</h1>
+                <div class="user-info">
+                    <span>Welcome, <strong id="userName">Student</strong></span>
+                    <button class="logout-btn" data-action="logout">Logout</button>
+                </div>
+            </div>
+
+            <!-- Attendance Overview -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>Overall Attendance</h3>
+                    <div class="percentage-circle" id="percentageCircle" style="--percentage: 0%;">
+                        <span class="percentage-value" id="percentageValue">0%</span>
+                    </div>
+                    <p id="statusText" class="attendance-status-good">Good Standing</p>
+                </div>
+                
+                <div class="stat-card">
+                    <h3>Total Classes</h3>
+                    <div class="number" id="totalClasses">0</div>
+                </div>
+                
+                <div class="stat-card">
+                    <h3>Present</h3>
+                    <div class="number" id="presentCount" style="color: #27ae60;">0</div>
+                </div>
+                
+                <div class="stat-card">
+                    <h3>Absent</h3>
+                    <div class="number" id="absentCount" style="color: #e74c3c;">0</div>
+                </div>
+            </div>
+
+            <!-- Detailed Records -->
+            <div class="mt-20">
+                <h2 class="mb-20">Attendance History</h2>
+                <div class="data-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Status</th>
+                                <th>Marked By</th>
+                            </tr>
+                        </thead>
+                        <tbody id="attendanceHistory">
+                            <!-- Populated by JS -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div class="mt-20">
+                <h2 class="mb-20">Attendance Calendar</h2>
+                <div id="attendanceCalendar" class="calendar-grid"></div>
+            </div>
+        </main>
+    </div>
+
+    <script src="./JS/api.js"></script>
+    <script src="./JS/storage.js"></script>
+    <script src="./JS/auth.js"></script>
+    <script>
+        (async function() {
+            const user = await AuthManager.verifyAuth('student');
+            if (!user) return;
+            AuthManager.updateUI();
+            loadStudentData();
+        })();
+
+        async function loadStudentData() {
+            const student = AuthManager.getCurrentUser();
+            if (!student) return;
+            
+            try {
+                // Get stats from backend
+                const data = await API.getStudentStats(student.id);
+                
+                // Update stats
+                document.getElementById('totalClasses').textContent = data.total;
+                document.getElementById('presentCount').textContent = data.present;
+                document.getElementById('absentCount').textContent = data.absent;
+                
+                // Update circle chart
+                document.getElementById('percentageCircle').style.setProperty('--percentage', data.percentage + '%');
+                document.getElementById('percentageValue').textContent = data.percentage + '%';
+                
+                // Update status text
+                const statusText = document.getElementById('statusText');
+                if (data.percentage >= 75) {
+                    statusText.textContent = 'Good Standing';
+                    statusText.className = 'attendance-status-good';
+                } else if (data.percentage >= 60) {
+                    statusText.textContent = 'Warning - Attend More Classes';
+                    statusText.className = 'attendance-status-warning';
+                } else {
+                    statusText.textContent = 'Critical - Low Attendance';
+                    statusText.className = 'attendance-status-danger';
+                }
+                
+                // Load history table
+                const tbody = document.getElementById('attendanceHistory');
+                tbody.innerHTML = '';
+                
+                if (data.records.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="3" style="text-align: center;">No attendance records yet</td></tr>';
+                    return;
+                }
+                
+                // Sort by date descending
+                data.records.sort((a, b) => new Date(b.date) - new Date(a.date));
+                
+                data.records.forEach(record => {
+                    const row = tbody.insertRow();
+                    row.innerHTML = `
+                        <td>${record.date}</td>
+                        <td style="color: ${record.status === 'present' ? '#27ae60' : '#e74c3c'}; font-weight: bold; text-transform: capitalize;">
+                            ${record.status}
+                        </td>
+                        <td>${record.markedBy?.name || 'Teacher'}</td>
+                    `;
+                });
+
+                renderAttendanceCalendar(data.records);
+            } catch (error) {
+                console.error('Error loading student data:', error);
+            }
+        }
+
+        function renderAttendanceCalendar(records) {
+            const container = document.getElementById('attendanceCalendar');
+            if (!container) return;
+
+            container.innerHTML = '';
+            const statusMap = records.reduce((map, record) => {
+                map[record.date] = record.status;
+                return map;
+            }, {});
+
+            const today = new Date();
+            const days = 30;
+            for (let i = days - 1; i >= 0; i--) {
+                const date = new Date(today);
+                date.setDate(today.getDate() - i);
+                const dateKey = date.toISOString().split('T')[0];
+                const status = statusMap[dateKey];
+
+                const cell = document.createElement('div');
+                cell.className = 'calendar-cell';
+                cell.innerHTML = `
+                    <strong>${date.getDate()}</strong>
+                    <span>${status || 'No data'}</span>
+                `;
+
+                if (status === 'Present') {
+                    cell.classList.add('present');
+                } else if (status === 'Absent') {
+                    cell.classList.add('absent');
+                } else {
+                    cell.classList.add('empty');
+                }
+
+                container.appendChild(cell);
+            }
+        }
+        
+        // Initialize
+        loadStudentData();
+    </script>
+</body>
+</html>
